@@ -1,0 +1,27 @@
+# Build directory
+build/
+
+# SDK configuration
+sdkconfig
+sdkconfig.old
+
+# Bootloader and partition table
+bootloader/
+partition_table/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Dependencies
+dependencies.lock

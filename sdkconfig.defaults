@@ -1,0 +1,18 @@
+# ESP32-S3 Configuration
+CONFIG_IDF_TARGET="esp32s3"
+
+# UART Configuration
+CONFIG_UART_ISR_IN_IRAM=y
+
+# FreeRTOS Configuration
+CONFIG_FREERTOS_HZ=1000
+
+# Main task stack size
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# Enable console output
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+CONFIG_ESP_CONSOLE_UART_NUM=0
+
+# Logging level
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
