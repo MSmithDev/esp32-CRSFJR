@@ -1,6 +1,13 @@
 #include "crsf_protocol.h"
+#include "soc/gpio_periph.h"
+#include "soc/gpio_sig_map.h"
+#include "esp_rom_gpio.h"
 
 static const char *TAG = "CRSF_PROTOCOL";
+
+// Half-duplex control functions
+static void crsf_set_tx_mode(void);
+static void crsf_set_rx_mode(void);
 
 static uint8_t crsf_crc_table[256] = {
     0x00, 0xD5, 0x7F, 0xAA, 0xFE, 0x2B, 0x81, 0x54, 0x29, 0xFC, 0x56, 0x83, 0xD7, 0x02, 0xA8, 0x7D,
@@ -20,6 +27,38 @@ static uint8_t crsf_crc_table[256] = {
     0xD6, 0x03, 0xA9, 0x7C, 0x28, 0xFD, 0x57, 0x82, 0xFF, 0x2A, 0x80, 0x55, 0x01, 0xD4, 0x7E, 0xAB,
     0x84, 0x51, 0xFB, 0x2E, 0x7A, 0xAF, 0x05, 0xD0, 0xAD, 0x78, 0xD2, 0x07, 0x53, 0x86, 0x2C, 0xF9
 };
+
+// Half-duplex control functions for one-wire operation
+static void crsf_set_tx_mode(void) {
+    // Disable interrupts during GPIO matrix reconfiguration
+    portDISABLE_INTERRUPTS();
+    
+    // Set pin as output
+    gpio_set_direction(CRSF_UART_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_level(CRSF_UART_PIN, 1);  // Set high (idle state)
+    
+    // Disconnect RX from GPIO matrix and connect TX
+    gpio_matrix_in(0x30, U2RXD_IN_IDX, false);  // Disconnect RX (route constant 0 to matrix)
+    gpio_matrix_out(CRSF_UART_PIN, U2TXD_OUT_IDX, false, false);  // Connect TX to pin
+    
+    portENABLE_INTERRUPTS();
+}
+
+static void crsf_set_rx_mode(void) {
+    // Disable interrupts during GPIO matrix reconfiguration
+    portDISABLE_INTERRUPTS();
+    
+    // Set pin as input with pull-up
+    gpio_set_direction(CRSF_UART_PIN, GPIO_MODE_INPUT);
+    gpio_pullup_en(CRSF_UART_PIN);
+    gpio_pulldown_dis(CRSF_UART_PIN);
+    
+    // Connect RX to GPIO matrix and disconnect TX
+    gpio_matrix_in(CRSF_UART_PIN, U2RXD_IN_IDX, false);  // Connect RX to pin
+    gpio_matrix_out(CRSF_UART_PIN, 0x100, false, false);  // Disconnect TX from pin
+    
+    portENABLE_INTERRUPTS();
+}
 
 uint8_t crsf_calculate_crc(uint8_t *data, size_t len) {
     uint8_t crc = 0;
@@ -67,16 +106,23 @@ esp_err_t crsf_init(void) {
         return ret;
     }
     
-    ret = uart_set_pin(CRSF_UART_NUM, CRSF_UART_TX_PIN, CRSF_UART_RX_PIN, 
-                       CRSF_UART_RTS_PIN, CRSF_UART_CTS_PIN);
+    // For half-duplex, we don't use uart_set_pin() - we manually configure the GPIO matrix
+    // Initialize GPIO pin for half-duplex operation
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << CRSF_UART_PIN),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    ret = gpio_config(&io_conf);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set UART pins: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to configure GPIO: %s", esp_err_to_name(ret));
         return ret;
     }
     
-    // Configure TX pin as open-drain for half-duplex operation
-    gpio_set_direction(CRSF_UART_TX_PIN, GPIO_MODE_OUTPUT_OD);
-    gpio_pullup_en(CRSF_UART_TX_PIN);
+    // Start in RX mode
+    crsf_set_rx_mode();
     
     ESP_LOGI(TAG, "CRSF protocol initialized successfully");
     return ESP_OK;
@@ -90,12 +136,26 @@ esp_err_t crsf_send_frame(crsf_frame_t *frame) {
     // Calculate and set CRC
     frame->crc = crsf_calculate_crc(&frame->length, frame->length - 1);
     
+    // Switch to TX mode for transmission
+    crsf_set_tx_mode();
+    
+    // Small delay to ensure GPIO matrix has switched
+    vTaskDelay(pdMS_TO_TICKS(1));
+    
     // Send frame
     int bytes_written = uart_write_bytes(CRSF_UART_NUM, frame, frame->length + 1);
     if (bytes_written != frame->length + 1) {
         ESP_LOGE(TAG, "Failed to send complete frame");
+        // Switch back to RX mode even on error
+        crsf_set_rx_mode();
         return ESP_ERR_INVALID_RESPONSE;
     }
+    
+    // Wait for transmission to complete
+    uart_wait_tx_done(CRSF_UART_NUM, pdMS_TO_TICKS(100));
+    
+    // Switch back to RX mode
+    crsf_set_rx_mode();
     
     ESP_LOGD(TAG, "Sent CRSF frame: sync=0x%02X, len=%d, type=0x%02X", 
              frame->sync, frame->length, frame->type);
@@ -164,6 +224,9 @@ esp_err_t crsf_process_received_frame(uint8_t *data, size_t len) {
     if (!data || len < 3) {
         return ESP_ERR_INVALID_ARG;
     }
+    
+    // Ensure we're in RX mode
+    crsf_set_rx_mode();
     
     // Find sync byte
     for (size_t i = 0; i < len - 2; i++) {

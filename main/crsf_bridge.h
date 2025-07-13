@@ -23,8 +23,7 @@
 
 #define CRSF_UART_NUM           UART_NUM_2
 #define CRSF_UART_BAUD_RATE     420000
-#define CRSF_UART_TX_PIN        GPIO_NUM_4
-#define CRSF_UART_RX_PIN        GPIO_NUM_5
+#define CRSF_UART_PIN           GPIO_NUM_4  // Single pin for half-duplex operation
 #define CRSF_UART_RTS_PIN       UART_PIN_NO_CHANGE
 #define CRSF_UART_CTS_PIN       UART_PIN_NO_CHANGE
 

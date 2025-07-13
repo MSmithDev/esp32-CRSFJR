@@ -17,7 +17,7 @@ A serial bridge application for ESP32-S3 that enables communication between a ho
 - **RF Module**: RadioMaster Nomad (ExpressLRS v3.5.6)
 - **Connections**:
   - Host UART: TX=GPIO17, RX=GPIO18
-  - CRSF UART: TX=GPIO4, RX=GPIO5 (shared line for half-duplex)
+  - CRSF UART: GPIO4 (single pin for half-duplex operation)
 
 ## Software Requirements
 
@@ -121,7 +121,7 @@ The implementation follows CRSF v3 specification with support for:
 - Device control commands (frequency, power, binding)
 - Link statistics telemetry
 - Device information queries
-- Half-duplex UART communication
+- True one-wire half-duplex UART communication with GPIO matrix switching
 
 ## Development
 
