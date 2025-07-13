@@ -51,6 +51,7 @@ typedef enum {
     CMD_SET_BIND,
     CMD_GET_TELEM,
     CMD_INFO,
+    CMD_SEND_CHANNELS,
     CMD_UNKNOWN
 } command_type_t;
 
@@ -68,6 +69,7 @@ typedef struct {
     command_type_t type;
     char param[64];
     int param_value;
+    uint8_t channel_data[22];  // For RC channel data (16 channels * 11 bits packed)
 } host_command_t;
 
 // Telemetry data structure

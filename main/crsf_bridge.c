@@ -54,6 +54,9 @@ void host_uart_task(void *pvParameters) {
                     case CMD_SET_BIND:
                         result = handle_set_bind_command();
                         break;
+                    case CMD_SEND_CHANNELS:
+                        result = handle_send_channels_command(cmd.param);
+                        break;
                     case CMD_GET_TELEM:
                         if (handle_get_telem_command(cmd_buffer, sizeof(cmd_buffer)) == ESP_OK) {
                             format_response(RESP_TELEM, cmd_buffer, tx_buffer, sizeof(tx_buffer));

@@ -224,3 +224,96 @@ esp_err_t crsf_process_received_frame(uint8_t *data, size_t len) {
     
     return ESP_ERR_NOT_FOUND;
 }
+
+void crsf_pack_rc_channels(uint16_t *channels, uint8_t *packed_data) {
+    if (!channels || !packed_data) {
+        return;
+    }
+    
+    // Clear output buffer
+    memset(packed_data, 0, CRSF_RC_CHANNEL_DATA_SIZE);
+    
+    // Pack 16 11-bit channels into 22 bytes
+    // Each channel is 11 bits (0-2047), where 1500 is center
+    for (int i = 0; i < CRSF_RC_CHANNEL_COUNT; i++) {
+        // Clamp channel value to 11-bit range
+        uint16_t channel_value = channels[i] & 0x7FF;
+        
+        // Calculate bit position in output buffer
+        int bit_pos = i * CRSF_RC_CHANNEL_BITS;
+        int byte_pos = bit_pos / 8;
+        int bit_offset = bit_pos % 8;
+        
+        // Pack the 11-bit value into the buffer
+        if (bit_offset <= 5) {
+            // Value fits in current byte and next byte
+            packed_data[byte_pos] |= (channel_value << bit_offset) & 0xFF;
+            packed_data[byte_pos + 1] |= (channel_value >> (8 - bit_offset)) & 0xFF;
+        } else {
+            // Value spans three bytes
+            packed_data[byte_pos] |= (channel_value << bit_offset) & 0xFF;
+            packed_data[byte_pos + 1] |= (channel_value >> (8 - bit_offset)) & 0xFF;
+            packed_data[byte_pos + 2] |= (channel_value >> (16 - bit_offset)) & 0xFF;
+        }
+    }
+}
+
+void crsf_unpack_rc_channels(uint8_t *packed_data, uint16_t *channels) {
+    if (!packed_data || !channels) {
+        return;
+    }
+    
+    // Unpack 22 bytes into 16 11-bit channels
+    for (int i = 0; i < CRSF_RC_CHANNEL_COUNT; i++) {
+        // Calculate bit position in input buffer
+        int bit_pos = i * CRSF_RC_CHANNEL_BITS;
+        int byte_pos = bit_pos / 8;
+        int bit_offset = bit_pos % 8;
+        
+        // Extract 11-bit value from buffer
+        uint16_t channel_value = 0;
+        
+        if (bit_offset <= 5) {
+            // Value spans two bytes
+            channel_value = (packed_data[byte_pos] >> bit_offset) & 0x7FF;
+            channel_value |= ((packed_data[byte_pos + 1] << (8 - bit_offset)) & 0x7FF);
+        } else {
+            // Value spans three bytes
+            channel_value = (packed_data[byte_pos] >> bit_offset) & 0x7FF;
+            channel_value |= ((packed_data[byte_pos + 1] << (8 - bit_offset)) & 0x7FF);
+            channel_value |= ((packed_data[byte_pos + 2] << (16 - bit_offset)) & 0x7FF);
+        }
+        
+        // Mask to 11 bits and store
+        channels[i] = channel_value & 0x7FF;
+    }
+}
+
+esp_err_t crsf_send_rc_channels(uint16_t *channels) {
+    if (!channels) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    uint8_t packed_data[CRSF_RC_CHANNEL_DATA_SIZE];
+    crsf_pack_rc_channels(channels, packed_data);
+    
+    return crsf_send_rc_channels_packed(packed_data);
+}
+
+esp_err_t crsf_send_rc_channels_packed(uint8_t *packed_data) {
+    if (!packed_data) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    ESP_LOGD(TAG, "Sending RC channels data");
+    
+    crsf_frame_t frame;
+    frame.sync = CRSF_SYNC_BYTE;
+    frame.length = CRSF_RC_CHANNEL_DATA_SIZE + 2; // payload + type + crc
+    frame.type = CRSF_FRAMETYPE_RC_CHANNELS_PACKED;
+    
+    // Copy channel data to payload
+    memcpy(frame.payload, packed_data, CRSF_RC_CHANNEL_DATA_SIZE);
+    
+    return crsf_send_frame(&frame);
+}

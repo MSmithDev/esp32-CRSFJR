@@ -90,6 +90,15 @@ typedef struct {
     uint8_t param_version;
 } __attribute__((packed)) crsf_device_info_t;
 
+// CRSF RC Channel Data Structure (16 channels, 11 bits each, packed)
+#define CRSF_RC_CHANNEL_COUNT 16
+#define CRSF_RC_CHANNEL_BITS 11
+#define CRSF_RC_CHANNEL_DATA_SIZE 22  // (16 * 11 + 7) / 8 = 22 bytes
+
+typedef struct {
+    uint8_t packed_channels[CRSF_RC_CHANNEL_DATA_SIZE];
+} __attribute__((packed)) crsf_rc_channels_t;
+
 // Function prototypes
 esp_err_t crsf_init(void);
 esp_err_t crsf_set_frequency(uint8_t mode);
@@ -101,5 +110,9 @@ esp_err_t crsf_send_frame(crsf_frame_t *frame);
 esp_err_t crsf_process_received_frame(uint8_t *data, size_t len);
 uint8_t crsf_calculate_crc(uint8_t *data, size_t len);
 bool crsf_validate_frame(crsf_frame_t *frame);
+esp_err_t crsf_send_rc_channels(uint16_t *channels);
+esp_err_t crsf_send_rc_channels_packed(uint8_t *packed_data);
+void crsf_pack_rc_channels(uint16_t *channels, uint8_t *packed_data);
+void crsf_unpack_rc_channels(uint8_t *packed_data, uint16_t *channels);
 
 #endif // CRSF_PROTOCOL_H

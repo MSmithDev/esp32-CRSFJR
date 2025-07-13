@@ -25,6 +25,7 @@ This application will operate as a serial bridge between a host system and a Rad
   * `SET_BIND` — Put Nomad into Binding Mode
   * `GET_TELEM` — Request latest telemetry data
   * `INFO` — Return Nomad configuration (future extension)
+  * `SEND_CHANNELS:<hex_data>` — Send 16-channel RC data to transmitter
 
 * Response format (examples):
 
@@ -76,12 +77,13 @@ void telemetry_relay_task(void *param);
 
 ## 5. Command Mapping
 
-| Host Command  | CRSF Command   | Payload                  | Notes                                      |
-| ------------- | -------------- | ------------------------ | ------------------------------------------ |
-| `SET_FREQ:xx` | Device Control | Payload ID + Mode        | Mode IDs per ELRS spec                     |
-| `SET_PWR:xx`  | Device Control | Payload ID + Power Level |                                            |
-| `SET_BIND`    | Bind Request   | Bind payload             |                                            |
-| `GET_TELEM`   | N/A            | N/A                      | Sends last received telemetry back to host |
+| Host Command       | CRSF Command   | Payload                  | Notes                                      |
+| ------------------ | -------------- | ------------------------ | ------------------------------------------ |
+| `SET_FREQ:xx`      | Device Control | Payload ID + Mode        | Mode IDs per ELRS spec                     |
+| `SET_PWR:xx`       | Device Control | Payload ID + Power Level |                                            |
+| `SET_BIND`         | Bind Request   | Bind payload             |                                            |
+| `SEND_CHANNELS:xx` | RC Channels    | 22 bytes packed channels | 16 channels, 11-bit each (0-2047)         |
+| `GET_TELEM`        | N/A            | N/A                      | Sends last received telemetry back to host |
 
 ---
 

@@ -15,5 +15,6 @@ esp_err_t handle_set_pwr_command(const char *param);
 esp_err_t handle_set_bind_command(void);
 esp_err_t handle_get_telem_command(char *response, size_t response_size);
 esp_err_t handle_info_command(char *response, size_t response_size);
+esp_err_t handle_send_channels_command(const char *param);
 
 #endif // SERIAL_COMMANDS_H
